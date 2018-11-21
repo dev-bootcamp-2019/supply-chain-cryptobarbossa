@@ -6,6 +6,50 @@ import "../contracts/SupplyChain.sol";
 
 contract TestSupplyChain {
 
+  uint public initialBalance = 15 ether;
+
+  function testAddItemUsingDeployedContract () public {
+    SupplyChain supplyChain = SupplyChain(DeployedAddresses.SupplyChain());
+
+    bool expected = true;
+
+    Assert.equal(supplyChain.addItem("car", 5000), expected, "Item should be added");
+    Assert.equal(supplyChain.addItem("watch", 1000), expected, "Item should be added");
+    Assert.equal(supplyChain.addItem("laptop", 1200), expected, "Item should be added");
+    Assert.equal(supplyChain.addItem("candy", 20), expected, "Item should be added");
+    Assert.equal(supplyChain.addItem("phone", 2000), expected, "Item should be added");
+  }
+
+  function testOnlyOwnerModifier() public {
+    SupplyChain supplyChain = new SupplyChain();
+    bool expected = true;
+    Assert.equal(supplyChain.addItem("car", 5000), expected, "Item should be added");
+    Assert.equal(supplyChain.addItem("candy", 20), expected, "Item should be added");
+    Assert.equal(supplyChain.resolveDispute(0), expected, "Contract owner only allowed access.");
+  }
+
+  function testBuyItemNotForSale () public {
+    SupplyChain supplyChain = new SupplyChain();
+    ThrowProxy throwProxy = new ThrowProxy(address(supplyChain));
+
+    SupplyChain(address(throwProxy)).buyItem(200);
+    bool r = throwProxy.execute.gas(200000)();
+
+    Assert.isFalse(r, "Should be false.");
+  }
+
+  function testBuyItemForSale () public {
+    SupplyChain supplyChain = new SupplyChain();
+    ThrowProxy throwProxy = new ThrowProxy(address(supplyChain));
+
+    // supplyChain.addItem("lamp",1);
+
+    SupplyChain(address(throwProxy)).buyItem(110);
+    bool r = throwProxy.call(1);
+
+    Assert.equal(r,true, "Should be true.");
+  }
+
     // Test for failing conditions in this contracts
     // test that every modifier is working
 
@@ -28,4 +72,22 @@ contract TestSupplyChain {
      
 
 
+}
+
+contract ThrowProxy {
+  address public target;
+  bytes data;
+
+  constructor (address _target) public {
+    target = _target;
+  }
+
+  //prime the data using the fallback function.
+  function () public {
+    data = msg.data;
+  }
+
+  function execute() public returns (bool) {
+    return target.call(data);
+  }
 }
