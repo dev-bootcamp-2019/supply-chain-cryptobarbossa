@@ -42,10 +42,10 @@ contract TestSupplyChain {
     SupplyChain supplyChain = new SupplyChain();
     ThrowProxy throwProxy = new ThrowProxy(address(supplyChain));
 
-    // supplyChain.addItem("lamp",1);
+    supplyChain.addItem("lamp",1);
 
-    SupplyChain(address(throwProxy)).buyItem(110);
-    bool r = throwProxy.call(1);
+    SupplyChain(address(throwProxy)).buyItem(0);
+    bool r = throwProxy.execute.gas(200000)();
 
     Assert.equal(r,true, "Should be true.");
   }
