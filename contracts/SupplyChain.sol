@@ -107,10 +107,10 @@ contract SupplyChain {
   }
 
   /* Mimick example of a dispute between two buyers whom have not finalized their transactions. */
-  function resolveDisputeFirstItem () public onlyOwner returns (bool) {
-    items[0].buyer = 0x0;
-    items[0].state = State.ForSale;
-    emit DisputeResolved(0);
+  function resolveDispute (uint256 _sku) public onlyOwner returns (bool) {
+    items[_sku].buyer = 0x0;
+    items[_sku].state = State.ForSale;
+    emit DisputeResolved(_sku);
     return true;
   }
 

@@ -46,11 +46,11 @@ contract TestSupplyChain {
   }
 
   function testOnlyOwnerModifier () public {
-    bool res = buyer.resolveDisputeFirstItem();
+    bool res = buyer.resolveDispute(itemSku);
 
     Assert.isFalse(res, "Dispute can only be resolved by owner.");
 
-    bool resOwner = supplyChain.resolveDisputeFirstItem();
+    bool resOwner = supplyChain.resolveDispute(itemSku);
 
     Assert.isTrue(resOwner, "Dispute can only be resolved by owner.");
   }
@@ -248,8 +248,8 @@ contract Proxy {
     return address(target).call(abi.encodeWithSignature("receiveItem(uint256)", _sku));
   }
 
-  function resolveDisputeFirstItem () public returns (bool) {
-    return address(target).call(abi.encodeWithSignature("resolveDisputeFirstItem()"));
+  function resolveDispute (uint256 _sku) public returns (bool) {
+    return address(target).call(abi.encodeWithSignature("resolveDispute(uint256)", _sku));
   }
 
 }
