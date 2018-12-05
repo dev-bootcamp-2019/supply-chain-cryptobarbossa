@@ -6,22 +6,26 @@ import "../contracts/SupplyChain.sol";
 
 contract TestSupplyChain {
 
+  // Initial Ether balance
   uint public initialBalance = 30 ether;
 
+  // Proxy assignments
   SupplyChain public supplyChain;
   Proxy public seller;
   Proxy public buyer;
   Proxy public randomUser;
 
+  // Item configs
   string itemName = "watermelon";
   uint256 itemPrice = 1;
   uint256 itemSku = 0;
 
   // Incorrect result for items that are not added
-  // itemPrice can be re-user but variable below added for clarity
+  // itemPrice can be re-used but variable below added for clarity
   uint256 fakeItemSku = 600;
   uint256 fakeItemPrice = 5;
 
+  // Mirrored State from SupplyChain
   enum State { 
     ForSale, 
     Sold, 
@@ -29,6 +33,7 @@ contract TestSupplyChain {
     Received
   }
 
+  // Before each func
   function beforeEach () public {
     supplyChain = new SupplyChain();
 
@@ -45,6 +50,7 @@ contract TestSupplyChain {
     seller.addItem(itemName,itemPrice);
   }
 
+  // Test access modifier with custom function
   function testOnlyOwnerModifier () public {
     bool res = buyer.resolveDispute(itemSku);
 
@@ -55,6 +61,7 @@ contract TestSupplyChain {
     Assert.isTrue(resOwner, "Dispute can only be resolved by owner.");
   }
 
+  // Test to check if item is for sale
   function testItemForSale() public {
     string memory _name;
     uint _sku;
@@ -73,12 +80,14 @@ contract TestSupplyChain {
     Assert.equal(_seller, address(seller), "Expected seller");
   }
 
+  // Test to check if user can buy item that is not for sale
   function testBuyItemNotForSale () public {
     bool res = buyer.buyItem(fakeItemSku,fakeItemPrice);
 
     Assert.isFalse(res, "Item purchase was successfull. Wrong expected result.");
   }
 
+  // Test to check if user can buy item that is for sale
   function testBuyItemForSale () public {
     bool res = buyer.buyItem(itemSku,itemPrice);
 
@@ -96,6 +105,7 @@ contract TestSupplyChain {
     Assert.equal(_state, uint256(State.Sold), "Item has incorrect State. Expected State = Sold ");
   }
 
+  // Test to check if user can buy item with wrong price
   function testBuyItemForSaleWrongPrice () public {
     bool res = buyer.buyItem(itemSku,itemPrice - 1);
 
@@ -113,6 +123,7 @@ contract TestSupplyChain {
     Assert.equal(_state, uint256(State.ForSale), "Item has incorrect State. Expected State = ForSale ");
   }
 
+  // Test if item can be shipped
   function testCanShipItem () public {
     bool res = buyer.buyItem(itemSku, itemPrice);
     Assert.isTrue(res, "Failed to purchase item.");
@@ -132,6 +143,7 @@ contract TestSupplyChain {
     Assert.equal(_state, uint256(State.Shipped), "Incorrect State. Expected = Shipped");
   }
 
+  // Test if item can be shipped with wrong state
   function testShipItemForSale() public {
     bool res = seller.shipItem(itemSku);
     Assert.isFalse(res, "Item has wrong State and cannot be Shipped.");
@@ -148,6 +160,7 @@ contract TestSupplyChain {
     Assert.equal(_state, uint256(State.ForSale), "State is incorrect. Expected = ForSale");
   }
 
+  // Test if item can be received without having been shipped 
   function testNotShippedItemReceived() public {
     bool res = buyer.buyItem(itemSku, itemPrice);
     Assert.isTrue(res, "Purchase failed. Please check price.");
@@ -167,6 +180,7 @@ contract TestSupplyChain {
     Assert.equal(_state, uint256(State.Sold), "Item expected State = Sold");
   }
 
+  // Test to check if buyer has received item
   function testBuyerReceivedItem() public {
     bool res = buyer.buyItem(itemSku, itemPrice);
     Assert.isTrue(res, "Purchase failed. Please check price.");
@@ -190,7 +204,8 @@ contract TestSupplyChain {
     Assert.equal(_state, uint256(State.Received), "Item state incorrect. Expected = Received");
   }
 
-  function testIncorrectBuyerNotReceivedItem() public {
+  // Test to check if random user can receive items
+  function testRandomUserReceiveItem() public {
     bool res = buyer.buyItem(itemSku, itemPrice);
     Assert.isTrue(res, "Purchase failed. Please check price.");
 
@@ -218,6 +233,7 @@ contract TestSupplyChain {
 
 }
 
+// Proxy contract
 contract Proxy {
   address public target;
 
