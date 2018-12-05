@@ -1,4 +1,4 @@
-pragma solidity ^0.4.13;
+pragma solidity ^0.4.24;
 
 import "truffle/Assert.sol";
 import "truffle/DeployedAddresses.sol";
@@ -6,88 +6,250 @@ import "../contracts/SupplyChain.sol";
 
 contract TestSupplyChain {
 
-  uint public initialBalance = 15 ether;
+  uint public initialBalance = 30 ether;
 
-  function testAddItemUsingDeployedContract () public {
-    SupplyChain supplyChain = SupplyChain(DeployedAddresses.SupplyChain());
+  SupplyChain public supplyChain;
+  Proxy public seller;
+  Proxy public buyer;
+  Proxy public randomUser;
 
-    bool expected = true;
+  string itemName = "watermelon";
+  uint256 itemPrice = 1;
+  uint256 itemSku = 0;
 
-    Assert.equal(supplyChain.addItem("car", 5000), expected, "Item should be added");
-    Assert.equal(supplyChain.addItem("watch", 1000), expected, "Item should be added");
-    Assert.equal(supplyChain.addItem("laptop", 1200), expected, "Item should be added");
-    Assert.equal(supplyChain.addItem("candy", 20), expected, "Item should be added");
-    Assert.equal(supplyChain.addItem("phone", 2000), expected, "Item should be added");
+  // Incorrect result for items that are not added
+  // itemPrice can be re-user but variable below added for clarity
+  uint256 fakeItemSku = 600;
+  uint256 fakeItemPrice = 5;
+
+  enum State { 
+    ForSale, 
+    Sold, 
+    Shipped, 
+    Received
   }
 
-  function testOnlyOwnerModifier() public {
-    SupplyChain supplyChain = new SupplyChain();
-    bool expected = true;
-    Assert.equal(supplyChain.addItem("car", 5000), expected, "Item should be added");
-    Assert.equal(supplyChain.addItem("candy", 20), expected, "Item should be added");
-    Assert.equal(supplyChain.resolveDispute(0), expected, "Contract owner only allowed access.");
+  function beforeEach () public {
+    supplyChain = new SupplyChain();
+
+    seller = new Proxy(supplyChain);
+
+    buyer = new Proxy(supplyChain);
+
+    randomUser = new Proxy(supplyChain);
+
+    uint256 fund = itemPrice + 1;
+
+    address(buyer).transfer(fund);
+
+    seller.addItem(itemName,itemPrice);
+  }
+
+  function testOnlyOwnerModifier () public {
+    bool res = buyer.resolveDisputeFirstItem();
+
+    Assert.isFalse(res, "Dispute can only be resolved by owner.");
+
+    bool resOwner = supplyChain.resolveDisputeFirstItem();
+
+    Assert.isTrue(resOwner, "Dispute can only be resolved by owner.");
+  }
+
+  function testItemForSale() public {
+    string memory _name;
+    uint _sku;
+    uint _price;
+    uint _state;
+    address _seller;
+    address _buyer;
+
+    (_name, _sku, _price, _state, _seller, _buyer) = supplyChain.fetchItem(itemSku);
+
+    Assert.equal(_name, itemName, "Expected name");
+    Assert.equal(_sku, itemSku, "Expected sku");
+    Assert.equal(_price, itemPrice, "Expected price");
+    Assert.equal(_state, uint(State.ForSale), "Expected state");
+    Assert.equal(_buyer, address(0), "Expected buyer = 0x0");
+    Assert.equal(_seller, address(seller), "Expected seller");
   }
 
   function testBuyItemNotForSale () public {
-    SupplyChain supplyChain = new SupplyChain();
-    ThrowProxy throwProxy = new ThrowProxy(address(supplyChain));
+    bool res = buyer.buyItem(fakeItemSku,fakeItemPrice);
 
-    SupplyChain(address(throwProxy)).buyItem(200);
-    bool r = throwProxy.execute.gas(200000)();
-
-    Assert.isFalse(r, "Should be false.");
+    Assert.isFalse(res, "Item purchase was successfull. Wrong expected result.");
   }
 
   function testBuyItemForSale () public {
-    SupplyChain supplyChain = new SupplyChain();
-    ThrowProxy throwProxy = new ThrowProxy(address(supplyChain));
+    bool res = buyer.buyItem(itemSku,itemPrice);
 
-    supplyChain.addItem("lamp",1);
+    Assert.isTrue(res, "Item purchase failed.");
 
-    SupplyChain(address(throwProxy)).buyItem(0);
-    bool r = throwProxy.execute.gas(200000)();
+    string memory _name;
+    uint _sku;
+    uint _price;
+    uint _state;
+    address _seller;
+    address _buyer;
 
-    Assert.equal(r,true, "Should be true.");
+    (_name, _sku, _price, _state, _seller, _buyer) = supplyChain.fetchItem(itemSku);
+
+    Assert.equal(_state, uint256(State.Sold), "Item has incorrect State. Expected State = Sold ");
   }
 
-    // Test for failing conditions in this contracts
-    // test that every modifier is working
+  function testBuyItemForSaleWrongPrice () public {
+    bool res = buyer.buyItem(itemSku,itemPrice - 1);
 
-    // buyItem
+    Assert.isFalse(res, "Item purchase succeeded. Not as expected.");
 
-    // test for failure if user does not send enough funds
-    // test for purchasing an item that is not for Sale
+    string memory _name;
+    uint _sku;
+    uint _price;
+    uint _state;
+    address _seller;
+    address _buyer;
 
+    (_name, _sku, _price, _state, _seller, _buyer) = supplyChain.fetchItem(itemSku);
 
-    // shipItem
+    Assert.equal(_state, uint256(State.ForSale), "Item has incorrect State. Expected State = ForSale ");
+  }
 
-    // test for calls that are made by not the seller
-    // test for trying to ship an item that is not marked Sold
+  function testCanShipItem () public {
+    bool res = buyer.buyItem(itemSku, itemPrice);
+    Assert.isTrue(res, "Failed to purchase item.");
 
-    // receiveItem
+    res = seller.shipItem(itemSku);
+    Assert.isTrue(res, "Shipment of item failed.");
 
-    // test calling the function from an address that is not the buyer
-    // test calling the function on an item not marked Shipped
+    string memory _name;
+    uint _sku;
+    uint _price;
+    uint _state;
+    address _seller;
+    address _buyer;
 
-     
+    (_name, _sku, _price, _state, _seller, _buyer) = supplyChain.fetchItem(itemSku);
 
+    Assert.equal(_state, uint256(State.Shipped), "Incorrect State. Expected = Shipped");
+  }
+
+  function testShipItemForSale() public {
+    bool res = seller.shipItem(itemSku);
+    Assert.isFalse(res, "Item has wrong State and cannot be Shipped.");
+    
+    string memory _name;
+    uint _sku;
+    uint _price;
+    uint _state;
+    address _seller;
+    address _buyer;
+
+    (_name, _sku, _price, _state, _seller, _buyer) = supplyChain.fetchItem(itemSku);
+
+    Assert.equal(_state, uint256(State.ForSale), "State is incorrect. Expected = ForSale");
+  }
+
+  function testNotShippedItemReceived() public {
+    bool res = buyer.buyItem(itemSku, itemPrice);
+    Assert.isTrue(res, "Purchase failed. Please check price.");
+
+    res = buyer.receiveItem(itemSku);
+    Assert.isFalse(res, "Items already sold cannot be received.");
+
+    string memory _name;
+    uint _sku;
+    uint _price;
+    uint _state;
+    address _seller;
+    address _buyer;
+
+    (_name, _sku, _price, _state, _seller, _buyer) = supplyChain.fetchItem(itemSku);
+
+    Assert.equal(_state, uint256(State.Sold), "Item expected State = Sold");
+  }
+
+  function testBuyerReceivedItem() public {
+    bool res = buyer.buyItem(itemSku, itemPrice);
+    Assert.isTrue(res, "Purchase failed. Please check price.");
+
+    res = seller.shipItem(itemSku);
+    Assert.isTrue(res, "Seller can ship item that was sold.");
+
+    res = buyer.receiveItem(itemSku);
+    
+    Assert.isTrue(res, "Buyer should be able to receive item.");
+
+    string memory _name;
+    uint _sku;
+    uint _price;
+    uint _state;
+    address _seller;
+    address _buyer;
+
+    (_name, _sku, _price, _state, _seller, _buyer) = supplyChain.fetchItem(itemSku);
+
+    Assert.equal(_state, uint256(State.Received), "Item state incorrect. Expected = Received");
+  }
+
+  function testIncorrectBuyerNotReceivedItem() public {
+    bool res = buyer.buyItem(itemSku, itemPrice);
+    Assert.isTrue(res, "Purchase failed. Please check price.");
+
+    res = seller.shipItem(itemSku);
+    Assert.isTrue(res, "Seller can ship item that was sold.");
+
+    res = randomUser.receiveItem(itemSku);
+    
+    Assert.isFalse(res, "Random user should not be able to receive item.");
+
+    string memory _name;
+    uint _sku;
+    uint _price;
+    uint _state;
+    address _seller;
+    address _buyer;
+
+    (_name, _sku, _price, _state, _seller, _buyer) = supplyChain.fetchItem(itemSku);
+
+    Assert.equal(_state, uint256(State.Shipped), "Item state incorrect. Expected = Shipped");
+  }
+
+  // Allow this contract to receive ether
+  function () public payable {}
 
 }
 
-contract ThrowProxy {
+contract Proxy {
   address public target;
-  bytes data;
 
   constructor (address _target) public {
     target = _target;
   }
 
-  //prime the data using the fallback function.
-  function () public {
-    data = msg.data;
+  // Allow contract to receive ether
+  function () public payable {}
+
+  function getTarget () public view returns (address) {
+    return target;
   }
 
-  function execute() public returns (bool) {
-    return target.call(data);
+  function addItem (string _name, uint256 _price) public {
+    SupplyChain(target).addItem(_name,_price);
   }
+
+  function buyItem (uint256 _sku, uint256 offer) public returns (bool) {
+    return address(target).call.value(offer)(abi.encodeWithSignature("buyItem(uint256)", _sku));
+  }
+
+  function shipItem (uint _sku) public returns (bool) {
+    return address(target).call(abi.encodeWithSignature("shipItem(uint256)", _sku));
+  }
+
+  function receiveItem (uint256 _sku) public returns (bool) {
+    return address(target).call(abi.encodeWithSignature("receiveItem(uint256)", _sku));
+  }
+
+  function resolveDisputeFirstItem () public returns (bool) {
+    return address(target).call(abi.encodeWithSignature("resolveDisputeFirstItem()"));
+  }
+
 }

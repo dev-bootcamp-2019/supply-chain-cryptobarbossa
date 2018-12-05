@@ -20,7 +20,7 @@ contract SupplyChain {
     Received
     (declaring them in this order is important for testing)
   */
-  enum State{ 
+  enum State { 
     ForSale, 
     Sold, 
     Shipped, 
@@ -107,10 +107,10 @@ contract SupplyChain {
   }
 
   /* Mimick example of a dispute between two buyers whom have not finalized their transactions. */
-  function resolveDispute (uint256 _sku) public onlyOwner returns (bool) {
-    items[_sku].buyer = 0x0;
-    items[_sku].state = State.ForSale;
-    emit DisputeResolved(_sku);
+  function resolveDisputeFirstItem () public onlyOwner returns (bool) {
+    items[0].buyer = 0x0;
+    items[0].state = State.ForSale;
+    emit DisputeResolved(0);
     return true;
   }
 
