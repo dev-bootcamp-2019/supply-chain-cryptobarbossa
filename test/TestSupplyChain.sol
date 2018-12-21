@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity ^0.5.0;
 
 import "truffle/Assert.sol";
 import "truffle/DeployedAddresses.sol";
@@ -37,11 +37,11 @@ contract TestSupplyChain {
   function beforeEach () public {
     supplyChain = new SupplyChain();
 
-    seller = new Proxy(supplyChain);
+    seller = new Proxy(address(supplyChain));
 
-    buyer = new Proxy(supplyChain);
+    buyer = new Proxy(address(supplyChain));
 
-    randomUser = new Proxy(supplyChain);
+    randomUser = new Proxy(address(supplyChain));
 
     uint256 fund = itemPrice + 1;
 
@@ -52,7 +52,7 @@ contract TestSupplyChain {
 
   // Test access modifier with custom function
   function testOnlyOwnerModifier () public {
-    bool res = buyer.resolveDispute(itemSku);
+    (bool res,) = buyer.resolveDispute(itemSku);
 
     Assert.isFalse(res, "Dispute can only be resolved by owner.");
 
@@ -82,14 +82,14 @@ contract TestSupplyChain {
 
   // Test to check if user can buy item that is not for sale
   function testBuyItemNotForSale () public {
-    bool res = buyer.buyItem(fakeItemSku,fakeItemPrice);
+    (bool res,) = buyer.buyItem(fakeItemSku,fakeItemPrice);
 
     Assert.isFalse(res, "Item purchase was successfull. Wrong expected result.");
   }
 
   // Test to check if user can buy item that is for sale
   function testBuyItemForSale () public {
-    bool res = buyer.buyItem(itemSku,itemPrice);
+    (bool res,) = buyer.buyItem(itemSku,itemPrice);
 
     Assert.isTrue(res, "Item purchase failed.");
 
@@ -107,7 +107,7 @@ contract TestSupplyChain {
 
   // Test to check if user can buy item with wrong price
   function testBuyItemForSaleWrongPrice () public {
-    bool res = buyer.buyItem(itemSku,itemPrice - 1);
+    (bool res,) = buyer.buyItem(itemSku,itemPrice - 1);
 
     Assert.isFalse(res, "Item purchase succeeded. Not as expected.");
 
@@ -125,10 +125,10 @@ contract TestSupplyChain {
 
   // Test if item can be shipped
   function testCanShipItem () public {
-    bool res = buyer.buyItem(itemSku, itemPrice);
+    (bool res,) = buyer.buyItem(itemSku, itemPrice);
     Assert.isTrue(res, "Failed to purchase item.");
 
-    res = seller.shipItem(itemSku);
+    (res,) = seller.shipItem(itemSku);
     Assert.isTrue(res, "Shipment of item failed.");
 
     string memory _name;
@@ -145,7 +145,7 @@ contract TestSupplyChain {
 
   // Test if item can be shipped with wrong state
   function testShipItemForSale() public {
-    bool res = seller.shipItem(itemSku);
+    (bool res,) = seller.shipItem(itemSku);
     Assert.isFalse(res, "Item has wrong State and cannot be Shipped.");
     
     string memory _name;
@@ -162,10 +162,10 @@ contract TestSupplyChain {
 
   // Test if item can be received without having been shipped 
   function testNotShippedItemReceived() public {
-    bool res = buyer.buyItem(itemSku, itemPrice);
+    (bool res,) = buyer.buyItem(itemSku, itemPrice);
     Assert.isTrue(res, "Purchase failed. Please check price.");
 
-    res = buyer.receiveItem(itemSku);
+    (res,) = buyer.receiveItem(itemSku);
     Assert.isFalse(res, "Items already sold cannot be received.");
 
     string memory _name;
@@ -182,13 +182,13 @@ contract TestSupplyChain {
 
   // Test to check if buyer has received item
   function testBuyerReceivedItem() public {
-    bool res = buyer.buyItem(itemSku, itemPrice);
+    (bool res,) = buyer.buyItem(itemSku, itemPrice);
     Assert.isTrue(res, "Purchase failed. Please check price.");
 
-    res = seller.shipItem(itemSku);
+    (res,) = seller.shipItem(itemSku);
     Assert.isTrue(res, "Seller can ship item that was sold.");
 
-    res = buyer.receiveItem(itemSku);
+    (res,) = buyer.receiveItem(itemSku);
     
     Assert.isTrue(res, "Buyer should be able to receive item.");
 
@@ -206,13 +206,13 @@ contract TestSupplyChain {
 
   // Test to check if random user can receive items
   function testRandomUserReceiveItem() public {
-    bool res = buyer.buyItem(itemSku, itemPrice);
+    (bool res,) = buyer.buyItem(itemSku, itemPrice);
     Assert.isTrue(res, "Purchase failed. Please check price.");
 
-    res = seller.shipItem(itemSku);
+    (res,) = seller.shipItem(itemSku);
     Assert.isTrue(res, "Seller can ship item that was sold.");
 
-    res = randomUser.receiveItem(itemSku);
+    (res,) = randomUser.receiveItem(itemSku);
     
     Assert.isFalse(res, "Random user should not be able to receive item.");
 
@@ -229,7 +229,7 @@ contract TestSupplyChain {
   }
 
   // Allow this contract to receive ether
-  function () public payable {}
+  function () external payable {}
 
 }
 
@@ -242,29 +242,29 @@ contract Proxy {
   }
 
   // Allow contract to receive ether
-  function () public payable {}
+  function () external payable {}
 
   function getTarget () public view returns (address) {
     return target;
   }
 
-  function addItem (string _name, uint256 _price) public {
+  function addItem (string memory _name, uint256 _price) public {
     SupplyChain(target).addItem(_name,_price);
   }
 
-  function buyItem (uint256 _sku, uint256 offer) public returns (bool) {
+  function buyItem (uint256 _sku, uint256 offer) public returns (bool, bytes memory) {
     return address(target).call.value(offer)(abi.encodeWithSignature("buyItem(uint256)", _sku));
   }
 
-  function shipItem (uint _sku) public returns (bool) {
+  function shipItem (uint _sku) public returns (bool, bytes memory) {
     return address(target).call(abi.encodeWithSignature("shipItem(uint256)", _sku));
   }
 
-  function receiveItem (uint256 _sku) public returns (bool) {
+  function receiveItem (uint256 _sku) public returns (bool, bytes memory) {
     return address(target).call(abi.encodeWithSignature("receiveItem(uint256)", _sku));
   }
 
-  function resolveDispute (uint256 _sku) public returns (bool) {
+  function resolveDispute (uint256 _sku) public returns (bool, bytes memory) {
     return address(target).call(abi.encodeWithSignature("resolveDispute(uint256)", _sku));
   }
 

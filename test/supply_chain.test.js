@@ -1,3 +1,10 @@
+/*
+This test file has been updated for Truffle version 5.0. If your tests are failing, make sure that you are
+using Truffle version 5.0. You can check this by running "trufffle version"  in the terminal. If version 5 is not
+installed, you can uninstall the existing version with `npm uninstall -g truffle` and install the latest version (5.0)
+with `npm install -g truffle`.
+*/
+
 var SupplyChain = artifacts.require("SupplyChain");
 
 contract("SupplyChain", function(accounts) {
@@ -7,22 +14,25 @@ contract("SupplyChain", function(accounts) {
   const emptyAddress = "0x0000000000000000000000000000000000000000";
 
   var sku;
-  const price = web3.toWei(1, "ether");
+  const price = "1000";
 
   it("should add an item with the provided name and price", async () => {
     const supplyChain = await SupplyChain.deployed();
 
     var eventEmitted = false;
-
-    var event = supplyChain.ForSale();
-    await event.watch((err, res) => {
-      sku = res.args.sku.toString(10);
-      eventEmitted = true;
-    });
-
+    /* Unused because it doesn't work on Travis as expected
+        var event = supplyChain.ForSale()
+        await event.watch((err, res) => {
+            sku = res.args.sku.toString(10)
+            eventEmitted = true
+        })
+*/
     const name = "book";
-
-    await supplyChain.addItem(name, price, { from: alice });
+    const tx = await supplyChain.addItem(name, price, { from: alice });
+    if (tx.logs[0].event === "ForSale") {
+      sku = tx.logs[0].args.sku.toString(10);
+      eventEmitted = true;
+    }
 
     const result = await supplyChain.fetchItem.call(sku);
 
@@ -62,22 +72,26 @@ contract("SupplyChain", function(accounts) {
     const supplyChain = await SupplyChain.deployed();
 
     var eventEmitted = false;
+    /* Unused because it doesn't work on Travis as expected
+        var event = supplyChain.Sold()
+        await event.watch((err, res) => {
+            sku = res.args.sku.toString(10)
+            eventEmitted = true
+        })
+*/
+    const amount = "2000";
 
-    var event = supplyChain.Sold();
-    await event.watch((err, res) => {
-      sku = res.args.sku.toString(10);
+    var aliceBalanceBefore = await web3.eth.getBalance(alice);
+    var bobBalanceBefore = await web3.eth.getBalance(bob);
+
+    const tx = await supplyChain.buyItem(sku, { from: bob, value: amount });
+    if (tx.logs[0].event === "Sold") {
+      sku = tx.logs[0].args.sku.toString(10);
       eventEmitted = true;
-    });
+    }
 
-    const amount = web3.toWei(2, "ether");
-
-    var aliceBalanceBefore = await web3.eth.getBalance(alice).toNumber();
-    var bobBalanceBefore = await web3.eth.getBalance(bob).toNumber();
-
-    await supplyChain.buyItem(sku, { from: bob, value: amount });
-
-    var aliceBalanceAfter = await web3.eth.getBalance(alice).toNumber();
-    var bobBalanceAfter = await web3.eth.getBalance(bob).toNumber();
+    var aliceBalanceAfter = await web3.eth.getBalance(alice);
+    var bobBalanceAfter = await web3.eth.getBalance(bob);
 
     const result = await supplyChain.fetchItem.call(sku);
 
@@ -93,13 +107,13 @@ contract("SupplyChain", function(accounts) {
     );
     assert.equal(eventEmitted, true, "adding an item should emit a Sold event");
     assert.equal(
-      aliceBalanceAfter,
-      aliceBalanceBefore + parseInt(price, 10),
+      parseInt(aliceBalanceAfter),
+      parseInt(aliceBalanceBefore, 10) + parseInt(price, 10),
       "alice's balance should be increased by the price of the item"
     );
     assert.isBelow(
-      bobBalanceAfter,
-      bobBalanceBefore - price,
+      parseInt(bobBalanceAfter),
+      parseInt(bobBalanceBefore, 10) - parseInt(price, 10),
       "bob's balance should be reduced by more than the price of the item (including gas costs)"
     );
   });
@@ -108,14 +122,18 @@ contract("SupplyChain", function(accounts) {
     const supplyChain = await SupplyChain.deployed();
 
     var eventEmitted = false;
-
-    var event = supplyChain.Shipped();
-    await event.watch((err, res) => {
-      sku = res.args.sku.toString(10);
+    /* Unused because it doesn't work on Travis as expected
+        var event = supplyChain.Shipped()
+        await event.watch((err, res) => {
+            sku = res.args.sku.toString(10)
+            eventEmitted = true
+        })
+*/
+    const tx = await supplyChain.shipItem(sku, { from: alice });
+    if (tx.logs[0].event === "Shipped") {
+      sku = tx.logs[0].args.sku.toString(10);
       eventEmitted = true;
-    });
-
-    await supplyChain.shipItem(sku, { from: alice });
+    }
 
     const result = await supplyChain.fetchItem.call(sku);
 
@@ -135,14 +153,18 @@ contract("SupplyChain", function(accounts) {
     const supplyChain = await SupplyChain.deployed();
 
     var eventEmitted = false;
-
-    var event = supplyChain.Received();
-    await event.watch((err, res) => {
-      sku = res.args.sku.toString(10);
+    /* Unused because it doesn't work on Travis as expected
+        var event = supplyChain.Received()
+        await event.watch((err, res) => {
+            sku = res.args.sku.toString(10)
+            eventEmitted = true
+        })
+*/
+    const tx = await supplyChain.receiveItem(sku, { from: bob });
+    if (tx.logs[0].event === "Received") {
+      sku = tx.logs[0].args.sku.toString(10);
       eventEmitted = true;
-    });
-
-    await supplyChain.receiveItem(sku, { from: bob });
+    }
 
     const result = await supplyChain.fetchItem.call(sku);
 

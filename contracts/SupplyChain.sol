@@ -1,4 +1,4 @@
-pragma solidity ^0.4.23;
+pragma solidity ^0.5.0;
 
 contract SupplyChain {
 
@@ -37,8 +37,8 @@ contract SupplyChain {
     uint256 sku;
     uint256 price;
     State state;
-    address seller;
-    address buyer;
+    address payable seller;
+    address payable buyer;
   }
 
   /* Create 4 events with the same name as each possible State (see above)
@@ -108,15 +108,15 @@ contract SupplyChain {
 
   /* Mimick example of a dispute between two buyers whom have not finalized their transactions. */
   function resolveDispute (uint256 _sku) public onlyOwner returns (bool) {
-    items[_sku].buyer = 0x0;
+    items[_sku].buyer = address(0x0);
     items[_sku].state = State.ForSale;
     emit DisputeResolved(_sku);
     return true;
   }
 
-  function addItem (string _name, uint256 _price) public checkPriceBoundary(_price) returns (bool) {
+  function addItem (string memory _name, uint256 _price) public checkPriceBoundary(_price) returns (bool) {
     emit ForSale(skuCount);
-    items[skuCount] = Item({name: _name, sku: skuCount, price: _price, state: State.ForSale, seller: msg.sender, buyer: 0});
+    items[skuCount] = Item({name: _name, sku: skuCount, price: _price, state: State.ForSale, seller: msg.sender, buyer: address(0x0)});
     skuCount = skuCount + 1;
     return true;
   }
@@ -149,7 +149,7 @@ contract SupplyChain {
   }
 
   /* We have these functions completed so we can run tests, just ignore it :) */
-  function fetchItem (uint _sku) public view returns (string name, uint sku, uint price, uint state, address seller, address buyer) {
+  function fetchItem (uint _sku) public view returns (string memory name, uint sku, uint price, uint state, address seller, address buyer) {
     name = items[_sku].name;
     sku = items[_sku].sku;
     price = items[_sku].price;
